@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"IM2.0/database"
-	"IM2.0/middleware"
-	"IM2.0/models"
-	"IM2.0/utils"
+	"im/database"
+	"im/middleware"
+	"im/models"
+	"im/utils"
 
 	"github.com/gin-gonic/gin"
 )

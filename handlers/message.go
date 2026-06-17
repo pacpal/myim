@@ -8,11 +8,12 @@ import (
 	"strconv"
 	"time"
 
-	"IM2.0/database"
-	"IM2.0/hub"
-	"IM2.0/middleware"
-	"IM2.0/models"
-	"IM2.0/utils"
+	"im/database"
+	"im/hub"
+	"im/middleware"
+	"im/models"
+	"im/util"
+	"im/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,9 +39,15 @@ func SendMessage(c *gin.Context) {
 	// Truncate content for weak network optimization
 	content := utils.TruncateContent(req.Content, 5000)
 
+	// Get previous message hash for the hash chain
+	var prevHash string
+	database.DB.QueryRow(
+		"SELECT curr_hash FROM messages ORDER BY id DESC LIMIT 1",
+	).Scan(&prevHash)
+
 	result, err := database.DB.Exec(
-		"INSERT INTO messages (from_user_id, to_user_id, content, msg_type) VALUES (?, ?, ?, ?)",
-		fromUserID, req.ToUserID, content, req.MsgType,
+		"INSERT INTO messages (from_user_id, to_user_id, content, msg_type, prev_hash) VALUES (?, ?, ?, ?, ?)",
+		fromUserID, req.ToUserID, content, req.MsgType, prevHash,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{Code: 500, Message: "发送失败"})
@@ -49,22 +56,31 @@ func SendMessage(c *gin.Context) {
 
 	msgID, _ := result.LastInsertId()
 
+	// Compute and persist the hash chain value (tamper-proof)
+	var createdAt string
+	database.DB.QueryRow("SELECT created_at FROM messages WHERE id = ?", msgID).Scan(&createdAt)
+	currHash := util.ComputeHash(prevHash, content, fromUserID, createdAt)
+	database.DB.Exec("UPDATE messages SET curr_hash = ? WHERE id = ?", currHash, msgID)
+
+	// Record audit log
+	var fromName string
+	database.DB.QueryRow("SELECT nickname FROM users WHERE id = ?", fromUserID).Scan(&fromName)
+	RecordAudit(fromUserID, fromName, "send_msg",
+		"私聊消息#"+strconv.FormatInt(msgID, 10)+" -> 用户"+strconv.Itoa(req.ToUserID), c.ClientIP())
+
 	// Check if recipient is online
 	if hub.DefaultHub.IsOnline(req.ToUserID) {
 		// Update status to delivered
 		database.DB.Exec("UPDATE messages SET status = 1 WHERE id = ?", msgID)
 
 		// Push via SSE
-		var fromName string
-		database.DB.QueryRow("SELECT nickname FROM users WHERE id = ?", fromUserID).Scan(&fromName)
-
 		msgData, _ := json.Marshal(gin.H{
 			"id":           msgID,
 			"from_user_id": fromUserID,
 			"from_name":    fromName,
 			"content":      content,
 			"msg_type":     req.MsgType,
-			"created_at":   time.Now().Format("2006-01-02 15:04:05"),
+			"created_at":   createdAt,
 		})
 		hub.DefaultHub.PushEvent(req.ToUserID, "message", string(msgData))
 	} else {
@@ -78,7 +94,7 @@ func SendMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, models.APIResponse{
 		Code:    200,
 		Message: "发送成功",
-		Data:    gin.H{"id": msgID, "status": 1},
+		Data:    gin.H{"id": msgID, "status": 1, "hash": currHash},
 	})
 }
 
@@ -195,9 +211,15 @@ func SendGroupMessage(c *gin.Context) {
 
 	content := utils.TruncateContent(req.Content, 5000)
 
+	// Get previous group message hash for the hash chain
+	var prevHash string
+	database.DB.QueryRow(
+		"SELECT curr_hash FROM group_messages ORDER BY id DESC LIMIT 1",
+	).Scan(&prevHash)
+
 	result, err := database.DB.Exec(
-		"INSERT INTO group_messages (group_id, from_user_id, content, msg_type) VALUES (?, ?, ?, ?)",
-		groupID, fromUserID, content, req.MsgType,
+		"INSERT INTO group_messages (group_id, from_user_id, content, msg_type, prev_hash) VALUES (?, ?, ?, ?, ?)",
+		groupID, fromUserID, content, req.MsgType, prevHash,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.APIResponse{Code: 500, Message: "发送失败"})
@@ -205,6 +227,12 @@ func SendGroupMessage(c *gin.Context) {
 	}
 
 	msgID, _ := result.LastInsertId()
+
+	// Compute and persist the hash chain value (tamper-proof)
+	var createdAt string
+	database.DB.QueryRow("SELECT created_at FROM group_messages WHERE id = ?", msgID).Scan(&createdAt)
+	currHash := util.ComputeHash(prevHash, content, fromUserID, createdAt)
+	database.DB.Exec("UPDATE group_messages SET curr_hash = ? WHERE id = ?", currHash, msgID)
 
 	// Get all group members and push via SSE
 	rows, err := database.DB.Query(
@@ -222,7 +250,7 @@ func SendGroupMessage(c *gin.Context) {
 			"from_name":    fromName,
 			"content":      content,
 			"msg_type":     req.MsgType,
-			"created_at":   time.Now().Format("2006-01-02 15:04:05"),
+			"created_at":   createdAt,
 		})
 		for rows.Next() {
 			var uid int
@@ -235,7 +263,7 @@ func SendGroupMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, models.APIResponse{
 		Code:    200,
 		Message: "发送成功",
-		Data:    gin.H{"id": msgID},
+		Data:    gin.H{"id": msgID, "hash": currHash},
 	})
 }
 

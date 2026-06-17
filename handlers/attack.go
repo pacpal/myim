@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"net/http"
 
-	"IM2.0/database"
-	"IM2.0/models"
-	"IM2.0/utils"
+	"im/database"
+	"im/models"
+	"im/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -184,6 +184,12 @@ func GetAttackGuide(c *gin.Context) {
 			"attack_url":  "/api/attack/dos/vulnerable",
 			"defense_url": "/api/protected/ping",
 			"description": "漏洞接口无限制执行重计算；防御接口通过速率限制中间件拦截高频请求",
+		},
+		{
+			"type":        "数据篡改(创新点)",
+			"attack_url":  "/api/attack/tamper/{id} (POST {\"content\":\"被篡改的内容\"})",
+			"defense_url": "/api/integrity/check",
+			"description": "攻击者直接修改数据库消息内容但不更新哈希链；防御端通过SHA256哈希链重新计算并比对，精确定位被篡改的记录。审计日志自身也受哈希链保护，防止管理员删日志",
 		},
 	}
 	c.JSON(http.StatusOK, models.APIResponse{Code: 200, Data: guide})

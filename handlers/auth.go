@@ -4,10 +4,10 @@ import (
 	"database/sql"
 	"net/http"
 
-	"IM2.0/database"
-	"IM2.0/middleware"
-	"IM2.0/models"
-	"IM2.0/utils"
+	"im/database"
+	"im/middleware"
+	"im/models"
+	"im/utils"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -98,9 +98,9 @@ func Login(c *gin.Context) {
 	// Parameterized query - SQL injection defense
 	var user models.User
 	err := database.DB.QueryRow(
-		"SELECT id, username, password, nickname, avatar FROM users WHERE username = ?",
+		"SELECT id, username, password, nickname, avatar, role FROM users WHERE username = ?",
 		req.Username,
-	).Scan(&user.ID, &user.Username, &user.Password, &user.Nickname, &user.Avatar)
+	).Scan(&user.ID, &user.Username, &user.Password, &user.Nickname, &user.Avatar, &user.Role)
 
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusUnauthorized, models.APIResponse{Code: 401, Message: "用户名或密码错误"})
@@ -126,6 +126,9 @@ func Login(c *gin.Context) {
 		user.ID, req.Username, ip, ua, 1,
 	)
 
+	// Record tamper-proof audit log
+	RecordAudit(user.ID, user.Username, "login", "登录成功", ip)
+
 	// Create session
 	token := utils.GenerateToken()
 	middleware.Sessions.Set(token, user.ID)
@@ -141,6 +144,7 @@ func Login(c *gin.Context) {
 			"username": user.Username,
 			"nickname": user.Nickname,
 			"avatar":   user.Avatar,
+			"role":     user.Role,
 		},
 	})
 }

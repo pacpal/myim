@@ -4,23 +4,24 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
-	"IM2.0/database"
-	"IM2.0/handlers"
-	"IM2.0/middleware"
+	"im/database"
+	"im/handlers"
+	"im/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// Database configuration - adjust to your MySQL settings
+	// Database configuration - reads from env, falls back to local defaults
 	dbConfig := database.Config{
 		Host:     getEnv("DB_HOST", "127.0.0.1"),
-		Port:     3307,
+		Port:     getEnvInt("DB_PORT", 3307),
 		User:     getEnv("DB_USER", "root"),
 		Password: getEnv("DB_PASSWORD", "root"),
-		DBName:   "im_system",
+		DBName:   getEnv("DB_NAME", "im_system"),
 	}
 
 	if err := database.InitDB(dbConfig); err != nil {
@@ -68,6 +69,12 @@ func main() {
 			attack.GET("/guide", handlers.GetAttackGuide)
 		}
 
+		// Tamper attack demo (requires auth to identify attacker)
+		attackAuth := api.Group("/attack", middleware.AuthMiddleware())
+		{
+			attackAuth.POST("/tamper/:id", handlers.TamperMessage)
+		}
+
 		// Protected routes (require auth)
 		protected := api.Group("")
 		protected.Use(middleware.AuthMiddleware())
@@ -107,6 +114,17 @@ func main() {
 
 			// Security audit
 			protected.GET("/logs/login", handlers.GetLoginLogs)
+
+			// Integrity check (any logged-in user can verify)
+			protected.GET("/integrity/check", handlers.IntegrityCheck)
+
+			// Admin routes (audit center, admin only)
+			admin := protected.Group("/admin", middleware.AdminMiddleware())
+			{
+				admin.GET("/audit/logs", handlers.GetAuditLogs)
+				admin.GET("/integrity/alerts", handlers.GetIntegrityAlerts)
+				admin.PUT("/integrity/alerts/:id/resolve", handlers.ResolveIntegrityAlert)
+			}
 		}
 	}
 
@@ -124,6 +142,15 @@ func main() {
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if v, err := strconv.Atoi(value); err == nil {
+			return v
+		}
 	}
 	return defaultValue
 }

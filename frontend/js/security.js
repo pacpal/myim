@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnXssSafe').addEventListener('click', () => testXSS(true));
     document.getElementById('btnDosVuln').addEventListener('click', () => testDoS(false));
     document.getElementById('btnDosSafe').addEventListener('click', () => testDoS(true));
+    document.getElementById('btnTamper').addEventListener('click', tamperMessage);
+    document.getElementById('btnCheck').addEventListener('click', integrityCheck);
 });
 
 // SQL Injection test
@@ -113,4 +115,58 @@ async function testDoS(safe) {
             resultBox.textContent += '当前请求数未超过限制（120次/分钟）。增加请求数可触发限流。';
         }
     }
+}
+
+// Tamper attack demo - simulates direct DB modification
+async function tamperMessage() {
+    const id = document.getElementById('tamperId').value;
+    const content = document.getElementById('tamperContent').value;
+    const resultBox = document.getElementById('tamperResult');
+    resultBox.textContent = '正在模拟篡改数据库...';
+
+    const res = await fetch('/api/attack/tamper/' + id, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
+        },
+        body: JSON.stringify({ content: content })
+    });
+    const data = await res.json();
+    resultBox.textContent = JSON.stringify(data, null, 2);
+    if (data.code === 200) {
+        resultBox.textContent += '\n\n⚠️ 已模拟直接修改数据库！curr_hash 未更新。\n现在点"执行完整性校验"即可检测到篡改。';
+    }
+}
+
+// Integrity check - hash chain verification
+async function integrityCheck() {
+    const resultBox = document.getElementById('checkResult');
+    resultBox.textContent = '正在扫描全部哈希链...';
+
+    const res = await fetch('/api/integrity/check', {
+        headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '') }
+    });
+    const data = await res.json();
+    if (data.code !== 200) {
+        resultBox.textContent = '校验失败: ' + JSON.stringify(data);
+        return;
+    }
+    const d = data.data;
+    let txt = '扫描完成！\n';
+    txt += '私信: ' + d.total_messages + ' 条 | 群消息: ' + d.total_group_msgs + ' 条 | 审计日志: ' + d.total_audit_logs + ' 条\n';
+    txt += '状态: ' + d.status + '\n';
+    txt += '发现异常: ' + d.alert_count + ' 处\n\n';
+    if (d.alert_count > 0) {
+        txt += '🚨 篡改详情：\n';
+        d.alerts.forEach(a => {
+            txt += '- [' + a.target_type + ' #' + a.target_id + '] ' + a.reason + '\n';
+            txt += '  期望: ' + (a.expected || '').substring(0, 32) + '...\n';
+            txt += '  实际: ' + (a.actual || '').substring(0, 32) + '...\n\n';
+        });
+        txt += '✅ 哈希链成功定位了被篡改的记录！管理员已收到实时告警。';
+    } else {
+        txt += '✅ 所有哈希链完整，未发现篡改。';
+    }
+    resultBox.textContent = txt;
 }

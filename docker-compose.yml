@@ -1,0 +1,75 @@
+# ============================================================
+# docker-compose.yml — one-command deployment for the im system
+#   $ docker compose up -d --build
+#
+# Services:
+#   - mysql : MySQL 8.0 database, auto-initializes schema on first run
+#   - im    : Go backend + static frontend, depends on mysql
+# ============================================================
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: im_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_DATABASE: ${DB_NAME:-im_system}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    ports:
+      - "${DB_PORT:-3307}:3306"
+    volumes:
+      - im_mysql_data:/var/lib/mysql
+      # Auto-run schema.sql on first container start (empty data volume only)
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${DB_PASSWORD:-root}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks:
+      - im_net
+
+  im:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: im_server
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      DB_NAME: ${DB_NAME:-im_system}
+      PORT: ${APP_PORT:-8080}
+      GIN_MODE: release
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    networks:
+      - im_net
+
+volumes:
+  im_mysql_data:
+
+networks:
+  im_net:
+    driver: bridge

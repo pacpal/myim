@@ -10,6 +10,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('myNickname').textContent = localStorage.getItem('nickname') || '用户';
     document.getElementById('myAvatar').textContent = (localStorage.getItem('nickname') || 'U').charAt(0).toUpperCase();
 
+    // Show audit center link for admins
+    if (parseInt(localStorage.getItem('role') || '0') === 1) {
+        const adminLink = document.getElementById('adminLink');
+        if (adminLink) adminLink.style.display = 'block';
+    }
+
     // Static event listeners
     document.getElementById('btnLogout').addEventListener('click', logout);
     document.getElementById('tabFriends').addEventListener('click', () => switchTab('friends'));

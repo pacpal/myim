@@ -1,4 +1,4 @@
-module IM2.0
+module im
 
 go 1.25.0
 

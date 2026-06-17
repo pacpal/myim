@@ -6,7 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"IM2.0/models"
+	"im/database"
+	"im/models"
 
 	"github.com/gin-gonic/gin"
 )
@@ -202,4 +203,25 @@ func GetToken(c *gin.Context) string {
 		return token.(string)
 	}
 	return ""
+}
+
+// AdminMiddleware requires the user to be an admin (role=1)
+func AdminMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := GetUserID(c)
+		if userID == 0 {
+			c.JSON(http.StatusUnauthorized, models.APIResponse{Code: 401, Message: "未登录"})
+			c.Abort()
+			return
+		}
+		var role int
+		database.DB.QueryRow("SELECT role FROM users WHERE id = ?", userID).Scan(&role)
+		if role != 1 {
+			c.JSON(http.StatusForbidden, models.APIResponse{Code: 403, Message: "需要管理员权限"})
+			c.Abort()
+			return
+		}
+		c.Set("role", role)
+		c.Next()
+	}
 }

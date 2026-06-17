@@ -5,12 +5,14 @@ CREATE DATABASE IF NOT EXISTS im_system DEFAULT CHARACTER SET utf8mb4 COLLATE ut
 USE im_system;
 
 -- 1. users table - user accounts
+-- role: 0=normal user, 1=admin (audit center access)
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     nickname VARCHAR(50) NOT NULL,
     avatar VARCHAR(255) DEFAULT '',
+    role TINYINT DEFAULT 0 COMMENT '0=normal, 1=admin',
     status TINYINT DEFAULT 0 COMMENT '0=offline, 1=online',
     last_login DATETIME DEFAULT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -64,7 +66,7 @@ CREATE TABLE IF NOT EXISTS group_members (
     UNIQUE KEY uk_group_user (group_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 6. messages table - private messages
+-- 6. messages table - private messages (with hash chain for tamper detection)
 CREATE TABLE IF NOT EXISTS messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     from_user_id INT NOT NULL,
@@ -72,6 +74,8 @@ CREATE TABLE IF NOT EXISTS messages (
     content TEXT NOT NULL,
     msg_type TINYINT DEFAULT 0 COMMENT '0=text, 1=image, 2=file',
     status TINYINT DEFAULT 0 COMMENT '0=sent, 1=delivered, 2=read',
+    prev_hash CHAR(64) DEFAULT '' COMMENT 'hash of previous message in chain',
+    curr_hash CHAR(64) DEFAULT '' COMMENT 'SHA256(prev_hash||content||from_user_id||created_at)',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -86,6 +90,8 @@ CREATE TABLE IF NOT EXISTS group_messages (
     from_user_id INT NOT NULL,
     content TEXT NOT NULL,
     msg_type TINYINT DEFAULT 0,
+    prev_hash CHAR(64) DEFAULT '' COMMENT 'hash of previous group message',
+    curr_hash CHAR(64) DEFAULT '' COMMENT 'SHA256(prev_hash||content||from_user_id||created_at)',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE CASCADE,
     FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -131,3 +137,38 @@ CREATE TABLE IF NOT EXISTS login_logs (
 
 -- Demo users will be created via the registration page.
 -- The password hashes are generated at runtime using bcrypt.
+
+-- ============================================================
+-- Tamper-proof audit IM extension: hash chain + audit logs
+-- ============================================================
+
+-- 11. audit_logs table - tamper-proof audit log (self-protected by hash chain)
+-- Records all sensitive operations; any modification to this table is detectable.
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    actor_id INT DEFAULT NULL COMMENT 'user performing the action',
+    actor_name VARCHAR(50) DEFAULT '',
+    action VARCHAR(50) NOT NULL COMMENT 'login/logout/send_msg/tamper/integrity_check etc.',
+    detail VARCHAR(500) DEFAULT '',
+    ip_address VARCHAR(45) DEFAULT '',
+    prev_hash CHAR(64) DEFAULT '' COMMENT 'hash of previous audit log entry',
+    curr_hash CHAR(64) DEFAULT '' COMMENT 'SHA256(prev_hash||actor_id||action||detail||created_at)',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_action (action),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 12. integrity_alerts table - alerts raised when tampering is detected
+CREATE TABLE IF NOT EXISTS integrity_alerts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    target_type VARCHAR(20) NOT NULL COMMENT 'message/group_message/audit_log',
+    target_id INT NOT NULL COMMENT 'id of tampered record',
+    expected_hash CHAR(64) DEFAULT '',
+    actual_hash CHAR(64) DEFAULT '',
+    reason VARCHAR(255) DEFAULT '',
+    detected_by INT DEFAULT NULL COMMENT 'admin user id, NULL if auto',
+    handled TINYINT DEFAULT 0 COMMENT '0=new, 1=resolved',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_handled (handled),
+    INDEX idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

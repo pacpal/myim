@@ -18,6 +18,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             localStorage.setItem('token', result.data.token);
             localStorage.setItem('user_id', result.data.user_id);
             localStorage.setItem('nickname', result.data.nickname);
+            localStorage.setItem('role', result.data.role || 0);
             alertBox.innerHTML = '<div class="alert alert-success">登录成功，正在进入聊天...</div>';
             setTimeout(() => location.href = '/static/chat.html', 1000);
         } else {

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>防篡改审计中心 - 管理员</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body { background:#1a1a2e; color:#eee; margin:0; }
+        .admin-page { max-width:1200px; margin:0 auto; padding:20px; }
+        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+        .tabs { display:flex; gap:8px; margin-bottom:20px; }
+        .tab { padding:10px 20px; background:#16213e; border-radius:6px; cursor:pointer; border:none; color:#eee; }
+        .tab.active { background:#667eea; }
+        .stat-row { display:flex; gap:16px; margin-bottom:20px; }
+        .stat-box { flex:1; background:#16213e; padding:20px; border-radius:8px; text-align:center; }
+        .stat-box .num { font-size:32px; font-weight:bold; }
+        .stat-box .label { color:#888; font-size:13px; }
+        .log-item { background:#16213e; padding:12px 16px; margin-bottom:8px; border-radius:6px; border-left:3px solid #667eea; }
+        .alert-item { background:#16213e; padding:12px 16px; margin-bottom:8px; border-radius:6px; border-left:3px solid #e74c3c; }
+        .alert-item.resolved { border-left-color:#2ecc71; opacity:0.7; }
+        .hash { font-family:monospace; font-size:11px; color:#888; word-break:break-all; }
+        .toast { position:fixed; top:20px; right:20px; background:#e74c3c; color:#fff; padding:14px 20px; border-radius:6px; z-index:9999; animation:slideIn 0.3s; }
+        @keyframes slideIn { from{transform:translateX(120%);} to{transform:translateX(0);} }
+        .empty { text-align:center; padding:40px; color:#666; }
+        .btn-sm { padding:4px 12px; font-size:12px; }
+    </style>
+</head>
+<body>
+    <div class="admin-page">
+        <div class="header">
+            <h1>🛡️ 防篡改审计中心</h1>
+            <div>
+                <a href="/static/chat.html" class="btn btn-sm">返回IM</a>
+                <button class="btn btn-sm" id="btnLogout">退出</button>
+            </div>
+        </div>
+
+        <div class="stat-row">
+            <div class="stat-box">
+                <div class="num" id="statMessages">0</div>
+                <div class="label">消息总数</div>
+            </div>
+            <div class="stat-box">
+                <div class="num" id="statAlerts" style="color:#e74c3c">0</div>
+                <div class="label">篡改告警</div>
+            </div>
+            <div class="stat-box">
+                <div class="num" id="statLogs" style="color:#2ecc71">0</div>
+                <div class="label">审计日志</div>
+            </div>
+            <div class="stat-box">
+                <div class="num" id="statNew" style="color:#f39c12">0</div>
+                <div class="label">未处理告警</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" id="tabAlerts">🚨 篡改告警</button>
+            <button class="tab" id="tabLogs">📋 审计日志</button>
+            <button class="tab" id="tabCheck">🔍 完整性校验</button>
+        </div>
+
+        <div id="paneAlerts">
+            <div class="empty">加载中...</div>
+        </div>
+        <div id="paneLogs" style="display:none;">
+            <div class="empty">加载中...</div>
+        </div>
+        <div id="paneCheck" style="display:none;">
+            <button class="btn btn-primary" id="btnCheck">立即执行完整性校验</button>
+            <div id="checkResult" style="margin-top:16px;"></div>
+        </div>
+    </div>
+
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/admin.js"></script>
+</body>
+</html>
