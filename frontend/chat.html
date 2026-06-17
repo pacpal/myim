@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IM聊天 - 弱网优化IM系统</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="user-info">
+                    <div class="avatar" id="myAvatar">U</div>
+                    <div>
+                        <div id="myNickname">用户</div>
+                        <small style="opacity:0.8">在线</small>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-secondary" id="btnLogout">退出</button>
+            </div>
+            <div class="tabs">
+                <div class="tab active" data-tab="friends" id="tabFriends">好友</div>
+                <div class="tab" data-tab="groups" id="tabGroups">群组</div>
+                <div class="tab" data-tab="requests" id="tabRequests">请求</div>
+            </div>
+            <div class="tab-content" id="listContent">
+                <div class="empty-state">加载中...</div>
+            </div>
+            <div style="padding:12px; border-top:1px solid #e0e0e0;">
+                <button class="btn btn-sm btn-primary" style="width:100%" id="btnAddFriend">+ 添加好友</button>
+            </div>
+        </div>
+        <div class="chat-area">
+            <div id="chatContent" class="empty-state">
+                选择一个好友或群组开始聊天
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="addModal">
+        <div class="modal">
+            <h3>搜索用户</h3>
+            <div class="form-group">
+                <input type="text" id="searchKeyword" placeholder="输入用户名搜索">
+            </div>
+            <div id="searchResults" style="max-height:300px; overflow-y:auto;"></div>
+            <div class="modal-actions">
+                <button class="btn btn-sm" id="btnCloseAddModal">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="groupModal">
+        <div class="modal">
+            <h3>创建群组</h3>
+            <div class="form-group">
+                <label>群名称</label>
+                <input type="text" id="groupName" placeholder="输入群名称">
+            </div>
+            <div class="form-group">
+                <label>群描述</label>
+                <input type="text" id="groupDesc" placeholder="群描述（可选）">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-sm" id="btnCancelGroup">取消</button>
+                <button class="btn btn-sm btn-success" id="btnCreateGroup">创建</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/auth.js"></script>
+    <script src="/static/js/chat.js"></script>
+</body>
+</html>

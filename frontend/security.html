@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>安全攻防演示 - IM系统</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="security-page">
+        <div class="nav">
+            <h2>🛡️ 安全攻防演示中心</h2>
+            <div>
+                <a href="/">首页</a> | 
+                <a href="/static/login.html">登录</a>
+            </div>
+        </div>
+
+        <!-- SQL Injection Demo -->
+        <div class="demo-card">
+            <h2>1. SQL注入攻击与防御 <span class="badge badge-danger">高危</span></h2>
+            <p class="desc">
+                SQL注入是通过在输入中插入SQL代码来操纵数据库的攻击方式。攻击者可绕过认证、窃取或篡改数据。<br>
+                <strong>攻击原理：</strong>漏洞接口使用字符串拼接构造SQL，<code>' OR '1'='1</code> 使WHERE条件恒真。<br>
+                <strong>防御方法：</strong>使用参数化查询（Prepared Statement），输入仅作为数据而非SQL代码处理。
+            </p>
+            <div class="demo-row">
+                <div class="demo-box vulnerable">
+                    <h4>⚠️ 漏洞接口（字符串拼接）</h4>
+                    <div class="code-block">SELECT * FROM users WHERE username = '" + input + "'</div>
+                    <input type="text" id="sqlInput" value="' OR '1'='1" placeholder="输入用户名">
+                    <button class="btn btn-sm btn-danger" id="btnSqlVuln">发起攻击</button>
+                    <div class="result-box" id="sqlVulnResult">等待测试...</div>
+                </div>
+                <div class="demo-box safe">
+                    <h4>✅ 防御接口（参数化查询）</h4>
+                    <div class="code-block">SELECT * FROM users WHERE username = ?</div>
+                    <input type="text" id="sqlInputSafe" value="' OR '1'='1" placeholder="输入用户名">
+                    <button class="btn btn-sm btn-success" id="btnSqlSafe">测试防御</button>
+                    <div class="result-box" id="sqlSafeResult">等待测试...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- XSS Demo -->
+        <div class="demo-card">
+            <h2>2. 跨站脚本攻击（XSS）与防御 <span class="badge badge-danger">高危</span></h2>
+            <p class="desc">
+                XSS攻击通过在网页中注入恶意脚本，当其他用户浏览时脚本被执行，可盗取Cookie或会话信息。<br>
+                <strong>攻击原理：</strong>漏洞接口直接返回原始内容，前端用innerHTML渲染会执行注入的代码。<br>
+                <strong>注意：</strong>浏览器安全特性规定 innerHTML 插入的 <code>&lt;script&gt;</code> 标签不会执行，
+                但 <code>&lt;img onerror&gt;</code>、<code>&lt;svg onload&gt;</code> 等事件型 payload 仍会触发！<br>
+                <strong>防御方法：</strong>对输出进行HTML转义，将 <code>&lt;</code> <code>&gt;</code> 等转为实体。
+            </p>
+            <div class="demo-row">
+                <div class="demo-box vulnerable">
+                    <h4>⚠️ 漏洞接口（原始输出）</h4>
+                    <div class="code-block">content = "&lt;img src=x onerror=alert('XSS')&gt;"</div>
+                    <textarea id="xssInput" rows="2">&lt;img src=x onerror=alert('XSS攻击成功！')&gt;</textarea>
+                    <button class="btn btn-sm btn-danger" id="btnXssVuln">发起攻击</button>
+                    <div class="result-box" id="xssVulnResult">等待测试...</div>
+                    <div style="margin-top:10px;">
+                        <small>渲染效果（漏洞）：</small>
+                        <div id="xssVulnRender" style="padding:10px; border:1px solid #ddd; border-radius:6px; background:#fff;"></div>
+                    </div>
+                </div>
+                <div class="demo-box safe">
+                    <h4>✅ 防御接口（HTML转义）</h4>
+                    <div class="code-block">escaped = html.EscapeString(content)</div>
+                    <textarea id="xssInputSafe" rows="2">&lt;img src=x onerror=alert('XSS攻击成功！')&gt;</textarea>
+                    <button class="btn btn-sm btn-success" id="btnXssSafe">测试防御</button>
+                    <div class="result-box" id="xssSafeResult">等待测试...</div>
+                    <div style="margin-top:10px;">
+                        <small>渲染效果（安全）：</small>
+                        <div id="xssSafeRender" style="padding:10px; border:1px solid #ddd; border-radius:6px; background:#fff;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DoS Demo -->
+        <div class="demo-card">
+            <h2>3. 拒绝服务攻击（DoS）与防御 <span class="badge badge-danger">高危</span></h2>
+            <p class="desc">
+                DoS攻击通过发送大量请求耗尽服务器资源，导致正常用户无法访问服务。<br>
+                <strong>攻击原理：</strong>漏洞接口无任何限制，每次请求执行重计算，并发请求会耗尽CPU。<br>
+                <strong>防御方法：</strong>①速率限制中间件 ②连接数限制 ③请求频率控制。
+            </p>
+            <div class="demo-row">
+                <div class="demo-box vulnerable">
+                    <h4>⚠️ 漏洞接口（无限制）</h4>
+                    <div class="code-block">无速率限制，每次执行1000万次循环</div>
+                    <label>并发请求数：</label>
+                    <input type="number" id="dosCount" value="50" min="1" max="200">
+                    <button class="btn btn-sm btn-danger" id="btnDosVuln">发起DoS攻击</button>
+                    <div class="result-box" id="dosVulnResult">等待测试...</div>
+                </div>
+                <div class="demo-box safe">
+                    <h4>✅ 防御接口（速率限制）</h4>
+                    <div class="code-block">RateLimitMiddleware: 120次/分钟/IP</div>
+                    <label>并发请求数：</label>
+                    <input type="number" id="dosCountSafe" value="50" min="1" max="200">
+                    <button class="btn btn-sm btn-success" id="btnDosSafe">测试防御</button>
+                    <div class="result-box" id="dosSafeResult">等待测试...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-card">
+            <h2>📋 防御方法总结</h2>
+            <table style="width:100%; border-collapse:collapse;">
+                <tr style="background:#667eea; color:#fff;">
+                    <th style="padding:12px; text-align:left;">攻击类型</th>
+                    <th style="padding:12px; text-align:left;">防御方法1</th>
+                    <th style="padding:12px; text-align:left;">防御方法2</th>
+                    <th style="padding:12px; text-align:left;">防御方法3</th>
+                </tr>
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:12px;">SQL注入</td>
+                    <td style="padding:12px;">参数化查询</td>
+                    <td style="padding:12px;">输入验证</td>
+                    <td style="padding:12px;">最小权限原则</td>
+                </tr>
+                <tr style="border-bottom:1px solid #eee;">
+                    <td style="padding:12px;">XSS</td>
+                    <td style="padding:12px;">HTML转义</td>
+                    <td style="padding:12px;">CSP策略</td>
+                    <td style="padding:12px;">HttpOnly Cookie</td>
+                </tr>
+                <tr>
+                    <td style="padding:12px;">DoS</td>
+                    <td style="padding:12px;">速率限制</td>
+                    <td style="padding:12px;">连接数限制</td>
+                    <td style="padding:12px;">请求频率控制</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <script src="/static/js/security.js"></script>
+</body>
+</html>
