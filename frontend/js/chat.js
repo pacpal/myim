@@ -22,6 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tabGroups').addEventListener('click', () => switchTab('groups'));
     document.getElementById('tabRequests').addEventListener('click', () => switchTab('requests'));
     document.getElementById('btnAddFriend').addEventListener('click', showAddModal);
+    const btnOpenGroup = document.getElementById('btnOpenGroupModal');
+    if (btnOpenGroup) btnOpenGroup.addEventListener('click', showGroupModal);
     document.getElementById('btnCloseAddModal').addEventListener('click', () => closeModal('addModal'));
     document.getElementById('btnCancelGroup').addEventListener('click', () => closeModal('groupModal'));
     document.getElementById('btnCreateGroup').addEventListener('click', createGroup);
@@ -48,6 +50,8 @@ function handleListClick(e) {
         acceptRequest(parseInt(item.dataset.id));
     } else if (action === 'rejectRequest') {
         rejectRequest(parseInt(item.dataset.id));
+    } else if (action === 'showGroupModal') {
+        showGroupModal();
     }
 }
 
@@ -79,11 +83,22 @@ function handleChatKeydown(e) {
 }
 
 // SSE connection with auto-reconnect (weak network optimization)
+let sseAuthFailCount = 0;
 function connectSSE() {
     const token = getToken();
+    if (!token) {
+        location.href = '/static/login.html';
+        return;
+    }
+    // 关键：确保只存在一个 EventSource，避免同时多重连
+    if (sseSource) {
+        try { sseSource.close(); } catch (e) {}
+        sseSource = null;
+    }
     sseSource = new EventSource('/api/sse?token=' + encodeURIComponent(token));
 
     sseSource.addEventListener('message', (e) => {
+        sseAuthFailCount = 0;
         handleIncomingMessage(JSON.parse(e.data));
     });
     sseSource.addEventListener('group_message', (e) => {
@@ -97,9 +112,34 @@ function connectSSE() {
         alert('收到来自 ' + req.from_nickname + ' 的好友请求');
         if (currentTab === 'requests') loadRequests();
     });
+    sseSource.addEventListener('presence', (e) => {
+        if (currentTab === 'friends') loadFriends();
+    });
     sseSource.onerror = () => {
-        sseSource.close();
-        setTimeout(() => { if (getToken()) connectSSE(); }, 3000);
+        // EventSource 原生已自带自动重连，只有当服务端主动拒绝（CLOSED）时才需要手动介入
+        if (sseSource && sseSource.readyState === EventSource.CLOSED) {
+            sseAuthFailCount++;
+            // 用轻量接口验证 token，若是 401 则跳登录页；否则手动重连一次
+            if (sseAuthFailCount >= 2) {
+                fetch('/api/ping', { headers: { 'Authorization': 'Bearer ' + token } })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data && data.code === 401) {
+                            localStorage.clear();
+                            location.href = '/static/login.html';
+                        } else {
+                            sseAuthFailCount = 0;
+                            setTimeout(() => { if (getToken()) connectSSE(); }, 3000);
+                        }
+                    })
+                    .catch(() => {
+                        setTimeout(() => { if (getToken()) connectSSE(); }, 3000);
+                    });
+            } else {
+                setTimeout(() => { if (getToken()) connectSSE(); }, 3000);
+            }
+        }
+        // 其余情况（OPEN 状态下的短暂网络抖动）由 EventSource 原生自动重连，不需要做任何事
     };
 }
 
@@ -156,21 +196,21 @@ async function loadFriends() {
 async function loadGroups() {
     const res = await apiGet('/api/groups');
     const content = document.getElementById('listContent');
-    let html = '<div style="padding:12px;"><button class="btn btn-sm btn-primary" style="width:100%" id="btnCreateGroupInline">+ 创建群组</button></div>';
-    content.innerHTML = html;
-    const inlineBtn = document.getElementById('btnCreateGroupInline');
-    if (inlineBtn) inlineBtn.addEventListener('click', showGroupModal);
+    // 用 data-action 走事件委托，避免 innerHTML 破坏 addEventListener
+    let html = '<div style="padding:12px;"><button class="btn btn-sm btn-primary" style="width:100%" data-action="showGroupModal">+ 创建群组</button></div>';
 
     if (!res || res.code !== 200 || !res.data || res.data.length === 0) {
-        content.innerHTML += '<div class="empty-state">暂无群组</div>';
+        html += '<div class="empty-state">暂无群组</div>';
+        content.innerHTML = html;
         return;
     }
-    content.innerHTML += res.data.map(g => {
+    html += res.data.map(g => {
         return '<div class="list-item" data-action="openChat" data-type="group" data-id="' + g.id + '" data-name="' + escapeHtml(g.name) + '">' +
             '<div class="avatar">' + escapeHtml(g.name.charAt(0).toUpperCase()) + '</div>' +
             '<div class="info"><div class="name">' + escapeHtml(g.name) + '</div>' +
             '<div class="last-msg">群主: ' + escapeHtml(g.owner_name) + '</div></div></div>';
     }).join('');
+    content.innerHTML = html;
 }
 
 // Load friend requests

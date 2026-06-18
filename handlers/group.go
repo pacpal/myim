@@ -13,6 +13,89 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// SearchGroups searches groups by name (for joining)
+func SearchGroups(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	keyword := c.Query("keyword")
+	if keyword == "" {
+		c.JSON(http.StatusOK, models.APIResponse{Code: 200, Data: []gin.H{}})
+		return
+	}
+
+	rows, err := database.DB.Query(`
+		SELECT g.id, g.name, g.description, g.created_at, u.nickname as owner_name
+		FROM `+"`groups`"+` g
+		JOIN users u ON g.owner_id = u.id
+		WHERE g.name LIKE ?
+		ORDER BY g.id DESC LIMIT 50`, "%"+utils.SanitizeInput(keyword)+"%")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{Code: 500, Message: "查询失败"})
+		return
+	}
+	defer rows.Close()
+
+	myGroups := make(map[int]bool)
+	myRows, _ := database.DB.Query("SELECT group_id FROM group_members WHERE user_id = ?", userID)
+	if myRows != nil {
+		for myRows.Next() {
+			var gid int
+			myRows.Scan(&gid)
+			myGroups[gid] = true
+		}
+		myRows.Close()
+	}
+
+	var groups []gin.H
+	for rows.Next() {
+		var id int
+		var name, description, createdAt, ownerName string
+		rows.Scan(&id, &name, &description, &createdAt, &ownerName)
+		joined, _ := myGroups[id]
+		groups = append(groups, gin.H{
+			"id":          id,
+			"name":        name,
+			"description": description,
+			"owner_name":  ownerName,
+			"joined":      joined,
+		})
+	}
+	c.JSON(http.StatusOK, models.APIResponse{Code: 200, Data: groups})
+}
+
+// JoinGroup lets a user join an existing group
+func JoinGroup(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	groupIDStr := c.Param("id")
+	groupID, _ := strconv.Atoi(groupIDStr)
+	if groupID == 0 {
+		c.JSON(http.StatusBadRequest, models.APIResponse{Code: 400, Message: "无效的群ID"})
+		return
+	}
+
+	// 检查群是否存在
+	var exists int
+	database.DB.QueryRow("SELECT 1 FROM `groups` WHERE id = ?", groupID).Scan(&exists)
+	if exists == 0 {
+		c.JSON(http.StatusNotFound, models.APIResponse{Code: 404, Message: "群不存在"})
+		return
+	}
+
+	// 检查是否已在群中
+	var alreadyIn int
+	database.DB.QueryRow("SELECT 1 FROM group_members WHERE group_id = ? AND user_id = ?", groupID, userID).Scan(&alreadyIn)
+	if alreadyIn > 0 {
+		c.JSON(http.StatusOK, models.APIResponse{Code: 200, Message: "已在群中"})
+		return
+	}
+
+	_, err := database.DB.Exec("INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 0)", groupID, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.APIResponse{Code: 500, Message: "加入失败"})
+		return
+	}
+	c.JSON(http.StatusOK, models.APIResponse{Code: 200, Message: "加入成功"})
+}
+
 // CreateGroup creates a new group
 func CreateGroup(c *gin.Context) {
 	userID := middleware.GetUserID(c)
