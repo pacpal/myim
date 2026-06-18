@@ -48,8 +48,6 @@
             <p class="desc">
                 XSS攻击通过在网页中注入恶意脚本，当其他用户浏览时脚本被执行，可盗取Cookie或会话信息。<br>
                 <strong>攻击原理：</strong>漏洞接口直接返回原始内容，前端用innerHTML渲染会执行注入的代码。<br>
-                <strong>注意：</strong>浏览器安全特性规定 innerHTML 插入的 <code>&lt;script&gt;</code> 标签不会执行，
-                但 <code>&lt;img onerror&gt;</code>、<code>&lt;svg onload&gt;</code> 等事件型 payload 仍会触发！<br>
                 <strong>防御方法：</strong>对输出进行HTML转义，将 <code>&lt;</code> <code>&gt;</code> 等转为实体。
             </p>
             <div class="demo-row">
@@ -123,7 +121,7 @@
                     <label>消息ID：</label>
                     <input type="number" id="tamperId" value="1" min="1">
                     <label>篡改为：</label>
-                    <input type="text" id="tamperContent" value="老板说明天涨薪取消" style="width:100%; margin-bottom:8px;">
+                    <input type="text" id="tamperContent" value="明天放假了" style="width:100%; margin-bottom:8px;">
                     <button class="btn btn-sm btn-danger" id="btnTamper">执行篡改</button>
                     <div class="result-box" id="tamperResult">等待测试...</div>
                 </div>

@@ -1,34 +1,14 @@
-# ===== Binaries / build output =====
+# Environment variables (contains secrets, do not commit)
+.env
+
+# Compiled binary
 *.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-im.exe
-im-server
+/main
 /im
 
-# ===== Go =====
+# Go workspace
 vendor/
-*.test
-*.out
 
-# ===== Docker / env =====
-.env
-.env.local
-.env.*.local
-
-# ===== IDE / editor =====
+# IDE
 .idea/
 .vscode/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# ===== Logs / runtime =====
-*.log
-logs/
-
-# ===== OS =====
-Thumbs.db

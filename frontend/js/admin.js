@@ -38,9 +38,22 @@ function handleAlertClick(e) {
 }
 
 async function loadAlerts() {
-    const res = await apiGet('/api/admin/integrity/alerts');
     const pane = document.getElementById('paneAlerts');
-    if (!res || res.code !== 200 || !res.data || res.data.length === 0) {
+    let res;
+    try {
+        res = await apiGet('/api/admin/integrity/alerts');
+    } catch (e) {
+        pane.innerHTML = '<div class="empty">⚠️ 网络错误，无法加载篡改告警</div>';
+        return;
+    }
+    if (!res || res.code !== 200) {
+        const msg = (res && res.message) ? res.message : '加载失败';
+        pane.innerHTML = '<div class="empty">⚠️ ' + escapeHtml(msg) + '（请确认使用管理员账号登录）</div>';
+        document.getElementById('statAlerts').textContent = 0;
+        document.getElementById('statNew').textContent = 0;
+        return;
+    }
+    if (!res.data || res.data.length === 0) {
         pane.innerHTML = '<div class="empty">暂无篡改告警，系统数据完整 ✅</div>';
         document.getElementById('statAlerts').textContent = 0;
         document.getElementById('statNew').textContent = 0;
@@ -63,9 +76,21 @@ async function loadAlerts() {
 }
 
 async function loadLogs() {
-    const res = await apiGet('/api/admin/audit/logs');
     const pane = document.getElementById('paneLogs');
-    if (!res || res.code !== 200 || !res.data || res.data.length === 0) {
+    let res;
+    try {
+        res = await apiGet('/api/admin/audit/logs');
+    } catch (e) {
+        pane.innerHTML = '<div class="empty">⚠️ 网络错误，无法加载审计日志</div>';
+        return;
+    }
+    if (!res || res.code !== 200) {
+        const msg = (res && res.message) ? res.message : '加载失败';
+        pane.innerHTML = '<div class="empty">⚠️ ' + escapeHtml(msg) + '（请确认使用管理员账号登录）</div>';
+        document.getElementById('statLogs').textContent = 0;
+        return;
+    }
+    if (!res.data || res.data.length === 0) {
         pane.innerHTML = '<div class="empty">暂无审计日志</div>';
         document.getElementById('statLogs').textContent = 0;
         return;

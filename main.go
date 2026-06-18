@@ -12,9 +12,13 @@ import (
 	"im/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load .env file if present (ignored if not found, e.g. in production)
+	_ = godotenv.Load()
+
 	// Database configuration - reads from env, falls back to local defaults
 	dbConfig := database.Config{
 		Host:     getEnv("DB_HOST", "127.0.0.1"),
@@ -66,13 +70,8 @@ func main() {
 			attack.POST("/xss/safe", handlers.XSSSafe)
 			attack.GET("/xss/safe", handlers.XSSSafe)
 			attack.GET("/dos/vulnerable", handlers.DoSVulnerable)
+			attack.POST("/tamper/:id", handlers.TamperMessage)
 			attack.GET("/guide", handlers.GetAttackGuide)
-		}
-
-		// Tamper attack demo (requires auth to identify attacker)
-		attackAuth := api.Group("/attack", middleware.AuthMiddleware())
-		{
-			attackAuth.POST("/tamper/:id", handlers.TamperMessage)
 		}
 
 		// Protected routes (require auth)
