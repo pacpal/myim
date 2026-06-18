@@ -120,17 +120,38 @@ func IntegrityCheck(c *gin.Context) {
 	RecordAudit(userID, uname, "integrity_check",
 		"发现"+strconv.Itoa(len(alerts))+"处异常", c.ClientIP())
 
-	// If tampering found, persist alerts and notify admins
+	// If tampering found, persist alerts and notify admins.
+	// Deduplicate: skip inserting when an UNHANDLED alert for the same
+	// (target_type, target_id, reason) already exists, otherwise repeated
+	// integrity checks would pile up duplicate rows (one per query) and the
+	// admin panel would show the same tamper over and over. Once an admin marks
+	// the alert as resolved (handled=1), a subsequent check will raise a fresh
+	// alert if the tampering is still present.
+	var newAlerts []gin.H
 	if len(alerts) > 0 {
 		for _, a := range alerts {
+			var existingID int
+			err := database.DB.QueryRow(
+				`SELECT id FROM integrity_alerts
+				 WHERE target_type = ? AND target_id = ? AND reason = ? AND handled = 0
+				 ORDER BY id DESC LIMIT 1`,
+				a["target_type"], a["target_id"], a["reason"],
+			).Scan(&existingID)
+			if err == nil {
+				// An unhandled alert already exists for this record; skip to avoid duplicates.
+				continue
+			}
 			database.DB.Exec(
 				`INSERT INTO integrity_alerts (target_type, target_id, expected_hash, actual_hash, reason)
 				 VALUES (?, ?, ?, ?, ?)`,
 				a["target_type"], a["target_id"], a["expected"], a["actual"], a["reason"],
 			)
+			newAlerts = append(newAlerts, a)
 		}
-		// Push real-time alert to admins
-		pushIntegrityAlertToAdmins(alerts)
+		// Push only newly-detected alerts to admins in real time
+		if len(newAlerts) > 0 {
+			pushIntegrityAlertToAdmins(newAlerts)
+		}
 	}
 
 	c.JSON(http.StatusOK, models.APIResponse{
